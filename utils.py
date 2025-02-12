@@ -5,6 +5,8 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import pandas as pd
+import os
+from tqdm import tqdm
 
 class LowLevelFeatureExtractor:
     def __init__(self, function: Callable, # pyfeats function to call
@@ -60,6 +62,9 @@ class CSVImageMetadataDataset(Dataset):
 
         return image, metadata, label  # Return image, metadata, and label
 
+class SwishActivation(torch.nn.Module):
+    def forward(self, x):
+        return x * torch.sigmoid(x)
 
 class SimpleNeuralNetwork(torch.nn.Module):
     def __init__(self, inputs: int, classes = 3, *args, **kwargs):
@@ -68,25 +73,36 @@ class SimpleNeuralNetwork(torch.nn.Module):
         self.relu = torch.nn.ReLU()
         self.fc2 = torch.nn.Linear(64, classes)
         self.softmax = torch.nn.Softmax(dim=1)
+        self.swish = SwishActivation()
+        self.batchNorm = torch.nn.BatchNorm1d(64)
+        self.dropout = torch.nn.Dropout(p=0.5)
 
     def forward(self, x, metadata):
-        x = torch.cat((x, metadata), dim=1)
+        x = torch.cat((x, metadata), dim=1).float()
         x = self.fc1(x)
-        x = self.relu(x)
+        x = self.batchNorm(x)
+        x = self.swish(x)
+        x = self.dropout(x)
+
         x = self.fc2(x)
-        x = self.softmax(x)
+        # x = self.softmax(x)
         return x
 
 def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, epochs: int, features_set: str):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.train()
+    print(f"Training model using {device}")
+
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs)):
         model.train()
         running_loss = 0.0
-        for inputs, labels in train_loader:
+        for inputs, metadata, labels in train_loader:
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            outputs = model(inputs, metadata)
+            loss = criterion(outputs, labels.long())
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -99,8 +115,8 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
     correct = 0
     total = 0
     with torch.no_grad():
-        for inputs, labels in test_loader:
-            outputs = model(inputs)
+        for inputs, metadata, labels in test_loader:
+            outputs = model(inputs, metadata)
             _, predicted = torch.max(outputs.data, 1)
 
             total += labels.size(0)
@@ -128,4 +144,4 @@ if __name__ == "__main__":
     
     # Call the extractor with the gray scale image
     features = llf(gray_scale_image)
-    print(llf.features_size)
+    print(features)
