@@ -75,7 +75,7 @@ class SimpleNeuralNetwork(torch.nn.Module):
         self.softmax = torch.nn.Softmax(dim=1)
         self.swish = SwishActivation()
         self.batchNorm = torch.nn.BatchNorm1d(64)
-        self.dropout = torch.nn.Dropout(p=0.5)
+        self.dropout = torch.nn.Dropout(p=0.3)
 
     def forward(self, x, metadata):
         x = torch.cat((x, metadata), dim=1).float()
