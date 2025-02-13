@@ -258,7 +258,7 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
         running_loss = 0.0
         for inputs, metadata, labels in train_loader:
             optimizer.zero_grad()
-            inputs = torchvision.transforms.ToTensor(llf(inputs)).to(device)
+            inputs = torch.Tensor(llf(inputs)).to(device)
             labels = labels.long().to(device)
             metadata = metadata.to(device)
 
