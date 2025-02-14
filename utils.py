@@ -86,17 +86,17 @@ param_list = [
 #     'params': {'mask': mask, 'N': 30, 'thresholds': [25, 50]},
 #     'features_set': ['pdf_L', 'pdf_M', 'pdf_H', 'cdf_L', 'cdf_M', 'cdf_H']
 # },
-{
-    'function': pyfeats.histogram, #Histogram
-    'params': {'mask': mask, 'bins': 32},
-    'features_set': ['H']
-},
-{
-    "function": pyfeats.multiregion_histogram, #Multi-region histogram
-    'params': {'mask': mask, 'bins': 32, 'num_eros': 3, 'square_size': 3},
-    'features_set': ['features']
-},
-# { Deprecated: generate all 0 values in the output}
+# { Deprecated: generate all 0 values in the output
+#     'function': pyfeats.histogram, #Histogram
+#     'params': {'mask': mask, 'bins': 32},
+#     'features_set': ['H']
+# },
+# { Deprecated: generate all 0 values in the output
+#     "function": pyfeats.multiregion_histogram, #Multi-region histogram
+#     'params': {'mask': mask, 'bins': 32, 'num_eros': 3, 'square_size': 3},
+#     'features_set': ['features']
+# },
+# { Deprecated: generate all 0 values in the output
 #     "function": pyfeats.correlogram, #Correlogram
 #     'params': {'mask': mask, 'bins_digitize' : 32, 'bins_hist' : 32, 'flatten' : True},
 #     'features_set': ['Hd', 'Ht']
@@ -111,11 +111,11 @@ param_list = [
     'params': {'bins': 32},
     'features_set': ['features'] # Take long time to calculate
 },
-{
-    "function": pyfeats.dwt_features, #Discrete Wavelet Transform (DWT)
-    'params': {'mask': mask, 'wavelet': 'bior3.3', 'levels': 3},
-    'features_set': ['features']
-},
+# {  Deprecated: generate NaN values in the output
+#     "function": pyfeats.dwt_features, #Discrete Wavelet Transform (DWT)
+#     'params': {'mask': mask, 'wavelet': 'bior3.3', 'levels': 3},
+#     'features_set': ['features']
+# },
 {
     "function": pyfeats.swt_features, #Stationary Wavelet Transform (SWT)
     'params': {'mask': mask, 'wavelet': 'bior3.3', 'levels': 3},
