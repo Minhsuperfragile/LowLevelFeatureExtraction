@@ -82,5 +82,10 @@ for llf_param in param_list[:1]:
     df_final.to_csv(f"./data/vaynen_train_{llf.function.__name__}.csv", index=False)
     #endregion
 
-    end_time = time.time()  # End timer
-    print(f"Execution time: {end_time - start_time:.6f} seconds for {llf.function.__name__}")
+    end_time = time.time()  # End timer\
+    seconds = end_time - start_time
+
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    remaining_seconds = seconds % 60
+    print(f"Execution time: {hours} hours, {minutes} minutes, {remaining_seconds} seconds for {llf.function.__name__}")
