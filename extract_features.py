@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from PIL import Image
 from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
 import warnings
@@ -32,9 +32,13 @@ X = 4
 train_df_chunks = np.array_split(train_df, X)
 test_df_chunks = np.array_split(test_df, X)
 
-for llf_param in param_list[:1]:
+for llf_param in param_list[1:2]:
     llf = LowLevelFeatureExtractor(**llf_param)
     n_features = llf.get_features_size()
+    features_folder = f"./data/{llf.function.__name__}"
+
+    if not os.path.exists(features_folder):
+        os.mkdir(features_folder)
 
     start_time = time.time()
 
@@ -43,8 +47,10 @@ for llf_param in param_list[:1]:
     results = []
     with ThreadPoolExecutor(max_workers=X) as executor:
         futures = [executor.submit(process_dataframe_chunk, chunk, root_folder, llf) for chunk in test_df_chunks]
-        for future in futures:
-            results.append(future.result())
+        with tqdm(total=len(futures), desc="Processing Test Chunks") as pbar:
+            for future in as_completed(futures):
+                results.append(future.result())  # Collect the result
+                pbar.update(1)  # Update tqdm progress bar
 
     # Combine all processed chunks back into a single DataFrame
     df_final = pd.concat(results, ignore_index=True)
@@ -57,7 +63,7 @@ for llf_param in param_list[:1]:
     df_final = df_final.drop(columns=["features"]).reset_index(drop=True)
     df_final = pd.concat([df_final, df_features], axis=1)
 
-    df_final.to_csv(f"./data/vaynen_test_{llf.function.__name__}.csv", index=False)
+    df_final.to_csv(os.path.join(features_folder, f"vaynen_test_{llf.function.__name__}.csv"), index=False)
     #endregion
 
     #region Train data process
@@ -65,8 +71,10 @@ for llf_param in param_list[:1]:
     results = []
     with ThreadPoolExecutor(max_workers=X) as executor:
         futures = [executor.submit(process_dataframe_chunk, chunk, root_folder, llf) for chunk in train_df_chunks]
-        for future in futures:
-            results.append(future.result())
+        with tqdm(total=len(futures), desc="Processing Train Chunks") as pbar:
+            for future in as_completed(futures):
+                results.append(future.result())  # Collect the result
+                pbar.update(1)  # Update tqdm progress bar
 
     # Combine all processed chunks back into a single DataFrame
     df_final = pd.concat(results, ignore_index=True)
@@ -79,7 +87,7 @@ for llf_param in param_list[:1]:
     df_final = df_final.drop(columns=["features"]).reset_index(drop=True)
     df_final = pd.concat([df_final, df_features], axis=1)
 
-    df_final.to_csv(f"./data/vaynen_train_{llf.function.__name__}.csv", index=False)
+    df_final.to_csv(os.path.join(features_folder, f"vaynen_train_{llf.function.__name__}.csv"), index=False)
     #endregion
 
     end_time = time.time()  # End timer\
@@ -88,4 +96,4 @@ for llf_param in param_list[:1]:
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
     remaining_seconds = seconds % 60
-    print(f"Execution time: {hours} hours, {minutes} minutes, {remaining_seconds} seconds for {llf.function.__name__}")
+    print(f"Execution time: {hours} hours, {minutes} minutes, {remaining_seconds:.2} seconds for {llf.function.__name__}")
