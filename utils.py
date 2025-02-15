@@ -8,7 +8,10 @@ import pandas as pd
 import os
 from tqdm import tqdm
 import torchvision
+import multiprocessing
+import time
 
+#region Feature Specifications
 mask = None
 param_list = [
 {
@@ -152,7 +155,9 @@ param_list = [
     'features_set': ['features']
 }
 ]
+#endregion
 
+#region Model Definition
 class ToNumpy():
     def __call__(self, *args, **kwds):
         return np.array(args[0])
@@ -240,8 +245,8 @@ class SimpleNeuralNetwork(torch.nn.Module):
         self.dropout = torch.nn.Dropout(p=0.3)
         self.sigmoid = torch.nn.Sigmoid()
 
-    def forward(self, x, metadata):
-        x = torch.cat((x, metadata), dim=1).float()
+    def forward(self, x, metadata = NotImplemented):
+        # x = torch.cat((x, metadata), dim=1).float()
         x = self.fc1(x)
         x = self.batchNorm(x)
         x = self.sigmoid(x)
@@ -250,7 +255,9 @@ class SimpleNeuralNetwork(torch.nn.Module):
         x = self.fc2(x)
         # x = self.softmax(x)
         return x
+#endregion
 
+#region Model Training Function
 def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, epochs: int, features_set: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -268,7 +275,7 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
             labels = labels.long().to(device)
             metadata = metadata.to(device)
 
-            outputs = model(inputs, metadata)
+            outputs = model(metadata)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -296,25 +303,56 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
             correct += (predicted.to(device) == labels).sum().item()
 
     return f"Accuracy: {100 * correct / total}% On {features_set}"
+#endregion
 
-if __name__ == "__main__":
-    # Example usage
-    import os, cv2
+#region Data Processing Functions
+# Function to process an image path
+def extract_features(image_path: os.PathLike, root_folder: os.PathLike, llf: LowLevelFeatureExtractor) -> np.ndarray:
+    image_path = os.path.join(root_folder, image_path)
+    image = Image.open(image_path).convert('L') # Convert to gray-scale
+    image = np.array(image)
+    features = llf.process_single_image(image)
+    return features
 
-    path = "C:\\Users\\trong\\Documents\\skin_data\\train\\12"
-    image_path = os.path.join(path, os.listdir(path)[0])
+# Function to process a smaller dataframe chunk
+def process_chunk(df_chunk: pd.DataFrame, root_folder: os.PathLike, llf: LowLevelFeatureExtractor):
+    return [extract_features(row['image'], root_folder, llf) for _, row in df_chunk.iterrows()]
 
-    # Read image from file
-    image = cv2.imread(image_path)
-
-    # Convert image to gray scale using OpenCV function
-    gray_scale_image  = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-    # Create an instance of LowLevelFeatureExtractor
-    llf = LowLevelFeatureExtractor(function=pyfeats.glcm_features, 
-                               params={'ignore_zeros': True}, 
-                               features_set=['features_mean', 'features_range'])
+def process_dataframe(
+        df: pd.DataFrame, 
+        llf: LowLevelFeatureExtractor ,
+        root_folder: os.PathLike = "../skin_data", # root image folder 
+        save_path: os.PathLike = "./data/result.csv",
+        n_process: int = None, 
+        time_logger=True
+        ) -> None:
     
-    # Call the extractor with the gray scale image
-    features = llf(gray_scale_image)
-    print(features)
+    n_process = multiprocessing.cpu_count()//2 if n_process is None else n_process
+    n_features = llf.get_features_size()
+    start_time = time.time() if time_logger else 0
+    df_chunks = np.array_split(df, n_process)
+
+    # Start multiprocessing pool
+    with multiprocessing.Pool(processes=n_process) as pool:
+        results = pool.starmap(process_chunk, [(chunk, root_folder, llf) for chunk in df_chunks])
+
+    # Combine all processed results into a DataFrame
+    flat_results = [item for sublist in results for item in sublist]  # Flatten list of lists\
+    df_features = pd.DataFrame(flat_results, columns=[f'feature_{i}' for i in range(n_features)])
+    df_features = pd.concat([df_features, df['image']], axis=1)
+
+    # print(tabulate(df_features, headers = 'keys', tablefmt = 'psql'))
+
+    # Merge features with original DataFrame
+    df_final = df.merge(df_features, on="image")
+
+    df_final.to_csv(save_path, index=False)
+
+    # Log the execution time
+    # End time tracking
+    if time_logger:
+        end_time = time.time()
+        execution_time = end_time - start_time
+        print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")
+    
+#endregion
