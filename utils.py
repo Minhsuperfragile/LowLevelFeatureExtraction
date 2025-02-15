@@ -204,6 +204,26 @@ class LowLevelFeatureExtractor:
 
         return self.features_size
 
+class CSVMetadataDataset(Dataset):
+    def __init__(self, csv_file: str, root_dir: str, transform=None):
+        self.data = pd.read_csv(csv_file)  # Load CSV file
+        self.root_dir = root_dir  # Base directory for images
+        self.transform = transform  # Transformations
+
+        # Extract image paths, labels, and metadata
+        # self.image_paths = self.data.iloc[:, 0].values  # Image paths
+        self.labels = self.data.iloc[:, 1].values.astype(int)  # Labels
+        self.metadata = self.data.iloc[:, 2:].values.astype(float)  # Metadata features (Numpy array)
+
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, idx):
+        label = self.labels[idx]
+        metadata = torch.tensor(self.metadata[idx], dtype=torch.float32)  # Convert metadata to tensor
+
+        return np.empty(0), metadata, label # None is used for image data, metadata is used instead
+
 class CSVImageMetadataDataset(Dataset):
     def __init__(self, csv_file: str, root_dir: str, transform=None):
         self.data = pd.read_csv(csv_file)  # Load CSV file
@@ -266,12 +286,12 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    for epoch in tqdm(range(epochs)):
+    for epoch in (pbar:= tqdm(range(epochs))):
         model.train()
         running_loss = 0.0
         for inputs, metadata, labels in train_loader:
             optimizer.zero_grad()
-            inputs = torch.Tensor(llf(inputs)).to(device)
+            # inputs = torch.Tensor(llf(inputs)).to(device)
             labels = labels.long().to(device)
             metadata = metadata.to(device)
 
@@ -280,7 +300,7 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-        print(f'Epoch {epoch+1}, Loss: {running_loss / len(train_loader.dataset)}')
+        pbar.set_description(f'Epoch {epoch+1}, Loss: {running_loss / len(train_loader.dataset)}')
 
     print(f"Training on {features_set} complete!")
 
@@ -293,10 +313,10 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
     total = 0
     with torch.no_grad():
         for inputs, metadata, labels in test_loader:
-            inputs = torch.Tensor(llf(inputs)).to(device)
+            # inputs = torch.Tensor(llf(inputs)).to(device)
             labels = labels.long().to(device)
             metadata = metadata.to(device)
-            outputs = model(inputs, metadata)
+            outputs = model(metadata)
             _, predicted = torch.max(outputs.data, 1)
 
             total += labels.size(0)
