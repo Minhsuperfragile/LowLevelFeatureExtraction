@@ -178,13 +178,19 @@ class LowLevelFeatureExtractor:
             features_set = {feature: value for feature, value in zip(self.features_set, features_output)}
 
             features_set = np.concatenate([features_set[key] for key in features_set.keys()], axis=0)
-            # features.append(np.expand_dims(features_set, axis=0))
+
             features.append(features_set)
 
         self.features_size = features_set.shape[0]
 
         return np.stack(features, axis=0)
     
+    def process_single_image(self, image:np.ndarray) -> np.ndarray:
+        features = self.function(image, **self.params)
+        features = {feature: value for feature, value in zip(self.features_set, features)}
+        features = np.concatenate([features[key] for key in features.keys()], axis=0)
+        return features
+
     def get_features_size(self) -> int:
         sample_image = np.random.randint(0, 256, (32, 32))
         features_set = self(np.expand_dims(sample_image, axis=0))
