@@ -10,21 +10,7 @@ if not os.path.exists(ckpt_folder):
     os.makedirs(ckpt_folder)
     print(f"Folder '{ckpt_folder}' created.")
 
-# root_folder = "../skin_data/"
-root_folder = "/mnt/c/Users/trong/Documents/skin_data" 
-
-# Define image transformations
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),  # Resize images to 128x128
-    transforms.Grayscale(num_output_channels=1),    # Convert to grayscale,
-    ToNumpy()  # Convert to numpy
-])
-
-train_dataset = CSVImageMetadataDataset(csv_file='./data/vaynen_train_linux.csv', root_dir=root_folder, transform=transform)
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)   
-
-test_dataset = CSVImageMetadataDataset(csv_file='./data/vaynen_test_linux.csv', root_dir=root_folder, transform=transform)
-test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=4)
+list_of_folder = os.listdir("data/")
 
 for llf_param_set in param_list[:1]:
     llf = LowLevelFeatureExtractor(**llf_param_set)

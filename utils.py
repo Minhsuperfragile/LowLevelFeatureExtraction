@@ -7,9 +7,10 @@ from PIL import Image
 import pandas as pd
 import os
 from tqdm import tqdm
-import torchvision
+from tabulate import tabulate
 import multiprocessing
 import time
+import cv2
 
 #region Feature Specifications
 mask = None
@@ -166,10 +167,12 @@ class LowLevelFeatureExtractor:
     def __init__(self, function: Callable, # pyfeats function to call
                  params: Dict[str, Any] = None, # pyfeats function parameters
                  features_set: List[str] = None, # list of features to extract
+                 image_size: Tuple[int, int] = None, # image size to resize images before processing
                  ) -> None:
         self.function = function
         self.params = params if params is not None else {}
         self.features_set = features_set
+        self.image_size = image_size if image_size is not None else (640, 640)
 
     def __call__(self, images):
         images = np.array(images) if not isinstance(images, np.ndarray) else images
@@ -186,21 +189,22 @@ class LowLevelFeatureExtractor:
 
             features.append(features_set)
 
-        self.features_size = features_set.shape[0]
-
         return np.stack(features, axis=0)
     
-    def process_single_image(self, image:np.ndarray) -> np.ndarray:
+    def process_single_image(self, image:np.ndarray, resize=False) -> np.ndarray:
+        if resize:
+            image = cv2.resize(image, self.image_size)
+
         features = self.function(image, **self.params)
         features = {feature: value for feature, value in zip(self.features_set, features)}
         features = np.concatenate([features[key] for key in features.keys()], axis=0)
         return features
 
     def get_features_size(self) -> int:
-        sample_image = np.random.randint(0, 256, (32, 32))
-        features_set = self(np.expand_dims(sample_image, axis=0))
+        sample_image = np.random.randint(0, 256, self.image_size)
+        features_set = self.process_single_image(sample_image)
 
-        self.features_size = features_set.shape[1]
+        self.features_size = features_set.shape[0]
 
         return self.features_size
 
@@ -331,7 +335,7 @@ def extract_features(image_path: os.PathLike, root_folder: os.PathLike, llf: Low
     image_path = os.path.join(root_folder, image_path)
     image = Image.open(image_path).convert('L') # Convert to gray-scale
     image = np.array(image)
-    features = llf.process_single_image(image)
+    features = llf.process_single_image(image, resize=True)
     return features
 
 # Function to process a smaller dataframe chunk
@@ -366,6 +370,10 @@ def process_dataframe(
     # Merge features with original DataFrame
     df_final = df.merge(df_features, on="image")
 
+    # Save dataframe to csv
+    save_folder = "/".join(save_path.split("/")[:-1])
+    if not os.path.exists(save_folder):
+        os.mkdir(save_folder)
     df_final.to_csv(save_path, index=False)
 
     # Log the execution time
