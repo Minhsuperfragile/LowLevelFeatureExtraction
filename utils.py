@@ -2,7 +2,8 @@ import pyfeats
 from typing import *
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 from PIL import Image
 import pandas as pd
 import os
@@ -166,13 +167,12 @@ class ToNumpy():
 class LowLevelFeatureExtractor:
     def __init__(self, function: Callable, # pyfeats function to call
                  params: Dict[str, Any] = None, # pyfeats function parameters
-                 features_set: List[str] = None, # list of features to extract
-                 image_size: Tuple[int, int] = None, # image size to resize images before processing
+                 features_set: List[str] = None, # list of features to extract,
                  ) -> None:
         self.function = function
         self.params = params if params is not None else {}
         self.features_set = features_set
-        self.image_size = image_size if image_size is not None else (640, 640)
+        # self.image_size = image_size if image_size is not None else (640, 640)
 
     def __call__(self, images):
         images = np.array(images) if not isinstance(images, np.ndarray) else images
@@ -191,17 +191,14 @@ class LowLevelFeatureExtractor:
 
         return np.stack(features, axis=0)
     
-    def process_single_image(self, image:np.ndarray, resize=False) -> np.ndarray:
-        if resize:
-            image = cv2.resize(image, self.image_size)
-
+    def process_single_image(self, image:np.ndarray) -> np.ndarray:
         features = self.function(image, **self.params)
         features = {feature: value for feature, value in zip(self.features_set, features)}
         features = np.concatenate([features[key] for key in features.keys()], axis=0)
         return features
 
     def get_features_size(self) -> int:
-        sample_image = np.random.randint(0, 256, self.image_size)
+        sample_image = np.random.randint(0, 256, (384,384)).astype("uint8")
         features_set = self.process_single_image(sample_image)
 
         self.features_size = features_set.shape[0]
@@ -331,20 +328,21 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
 
 #region Data Processing Functions
 # Function to process an image path
-def extract_features(image_path: os.PathLike, root_folder: os.PathLike, llf: LowLevelFeatureExtractor) -> np.ndarray:
+def extract_features(image_path: os.PathLike, root_folder: os.PathLike, llf: LowLevelFeatureExtractor, transform: transforms.Compose) -> np.ndarray:
     image_path = os.path.join(root_folder, image_path)
-    image = Image.open(image_path).convert('L') # Convert to gray-scale
+    image = transform(Image.open(image_path)) # Convert to gray-scale
     image = np.array(image)
-    features = llf.process_single_image(image, resize=True)
+    features = llf.process_single_image(image)
     return features
 
 # Function to process a smaller dataframe chunk
-def process_chunk(df_chunk: pd.DataFrame, root_folder: os.PathLike, llf: LowLevelFeatureExtractor):
-    return [extract_features(row['image'], root_folder, llf) for _, row in df_chunk.iterrows()]
+def process_chunk(df_chunk: pd.DataFrame, root_folder: os.PathLike, llf: LowLevelFeatureExtractor, transform: transforms.Compose):
+    return [extract_features(row['image'], root_folder, llf, transform) for _, row in df_chunk.iterrows()]
 
 def process_dataframe(
         df: pd.DataFrame, 
         llf: LowLevelFeatureExtractor ,
+        transform: transforms.Compose,
         root_folder: os.PathLike = "../skin_data", # root image folder 
         save_path: os.PathLike = "./data/result.csv",
         n_process: int = None, 
@@ -358,7 +356,7 @@ def process_dataframe(
 
     # Start multiprocessing pool
     with multiprocessing.Pool(processes=n_process) as pool:
-        results = pool.starmap(process_chunk, [(chunk, root_folder, llf) for chunk in df_chunks])
+        results = pool.starmap(process_chunk, [(chunk, root_folder, llf, transform) for chunk in df_chunks])
 
     # Combine all processed results into a DataFrame
     flat_results = [item for sublist in results for item in sublist]  # Flatten list of lists\
@@ -383,4 +381,17 @@ def process_dataframe(
         execution_time = end_time - start_time
         print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")
     
+def process_dataloader(
+        dl: DataLoader, 
+        llf: LowLevelFeatureExtractor ,
+        root_folder: os.PathLike = "../skin_data", # root image folder 
+        save_path: os.PathLike = "./data/result.csv",
+        n_process: int = None, 
+        time_logger=True
+        ):
+
+    batch_size = dl.batch_size
+
+
+
 #endregion
