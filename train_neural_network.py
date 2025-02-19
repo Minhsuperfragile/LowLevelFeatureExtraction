@@ -14,8 +14,8 @@ if not os.path.exists(ckpt_folder):
 
 batch_size = 32
 num_workers = 4
-md = "nmd"
-result_df = pd.read_csv("./ckpts/multiple_result.csv", index_col="features_name")
+md = "md"
+# result_df = pd.read_csv("./ckpts/multiple_result.csv", index_col="features_name")
 
 for llf_param_set in param_list:
     llf = LowLevelFeatureExtractor(**llf_param_set)
@@ -38,9 +38,10 @@ for llf_param_set in param_list:
     train_model(model, train_dataloader, llf, 30, llf_name)
     result , cm = evaluate_model(model, test_dataloader, llf, llf_name)
 
-    result_df.at[llf_name, f"nn_{md}"] = result
-    result_df.at[f'{llf_name}_0', f"nn_{md}"] = cm[0]
-    result_df.at[f'{llf_name}_1', f"nn_{md}"] = cm[1]
-    # torch.save(model.state_dict(), f'./ckpts/model_{llf_name}.pth')
+    # result_df.at[llf_name, f"nn_{md}"] = result
+    # result_df.at[f'{llf_name}_0', f"nn_{md}"] = cm[0]
+    # result_df.at[f'{llf_name}_1', f"nn_{md}"] = cm[1]
 
-result_df.to_csv("./ckpts/multiple_result.csv")
+    torch.save(model.state_dict(), f'./ckpts/model_{llf_name}.pth')
+
+# result_df.to_csv("./ckpts/multiple_result.csv")

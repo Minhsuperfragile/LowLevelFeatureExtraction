@@ -11,7 +11,7 @@ from tqdm import tqdm
 from tabulate import tabulate
 import multiprocessing
 import time
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 #region Feature Specifications
 mask = None
@@ -414,3 +414,32 @@ def process_dataframe(
         print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")
 
 #endregion
+
+#region Permutation Importance Calculation
+
+def permutation_feature_importance(model: SimpleNeuralNetwork, df:pd.DataFrame ):
+    test_df = df[:len(df)//2]
+    swap_df = df[len(df)//2:]
+
+    n_features = test_df.shape[1]
+
+    # Compute base acc
+    with torch.no_grad():
+        base_predictions = model(torch.Tensor(test_df.iloc[:,1:].to_numpy()))
+        _, base_predictions = torch.max(base_predictions.data, 1)
+        base_accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), base_predictions)
+
+    # Initialize a list to store the importance scores
+    importances = []
+    for i in range(7,n_features):
+        # Create a copy of the test data and swap the feature column with value from different swap dataframe
+        swapped_test_df = test_df.copy()
+        swapped_test_df.iloc[:, i] = swap_df.iloc[:,i]
+        # Calculate the model's prediction on the swapped test data
+        with torch.no_grad():
+            predictions = model(torch.Tensor(swapped_test_df.iloc[:,1:].to_numpy()))
+            _, predictions = torch.max(predictions.data, 1)
+            accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), predictions)
+            importances.append(accuracy - base_accuracy)
+
+    return importances
