@@ -1,4 +1,0 @@
-Accuracy: 70.42735042735043% On fos
-Accuracy: 69.14529914529915% On glcm_features
-Accuracy: 52.9059829059829% On glds_features
-Accuracy: 74.01709401709402% On wp_features

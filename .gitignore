@@ -1,4 +1,5 @@
 __pycache__/
 data/
 ckpts/*.pth
-ckpts/old_results.txt
+vdcd_data/
+ckpts/multiple_result*
