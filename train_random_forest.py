@@ -3,9 +3,10 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from utils import param_list
+import xgboost as xgb
 
-result_df = pd.read_csv("./multiple_result.csv", index_col="features_name")
-md = "md"
+result_df = pd.read_csv("./ckpts/multiple_result.csv", index_col="features_name")
+md = "nmd"
 features_mark = 2 if md == "md" else 8
 
 def process_confusion_matrix(label, pred):
@@ -19,9 +20,10 @@ def process_confusion_matrix(label, pred):
 
     return l
 
-for param in param_list:
+for param in param_list[:1]:
 
-    features_name = param['function'].__name__
+    # features_name = param['function'].__name__
+    features_name = "vip"
 
     # Load training data from CSV
     train_file_path = f"./data/{features_name}/vaynen_train_{features_name}_new.csv"  # Change this to your actual file path
@@ -56,16 +58,25 @@ for param in param_list:
     DTC_accuracy = accuracy_score(y_test, DTC_y_pred)
     DTC_class_acc = process_confusion_matrix(y_test, DTC_y_pred)
 
+    XGB = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
+    XGB.fit(X_train, y_train)
+    XGB_y_pred = XGB.predict(X_test)
+    XGB_accuracy = accuracy_score(y_test, XGB_y_pred)
+    XGB_class_acc = process_confusion_matrix(y_test, XGB_y_pred)
+
     result_df.at[features_name, f'gradient_boost_{md}'] = GBC_accuracy*100
     result_df.at[features_name, f'random_forest_{md}'] = RFC_accuracy*100
     result_df.at[features_name, f'decision_tree_{md}'] = DTC_accuracy*100
+    result_df.at[features_name, f'xgboost_{md}'] = XGB_accuracy*100
 
     result_df.at[f'{features_name}_0', f'gradient_boost_{md}'] = GBC_class_acc[0]
     result_df.at[f'{features_name}_0', f'random_forest_{md}'] = RFC_class_acc[0]
     result_df.at[f'{features_name}_0', f'decision_tree_{md}'] = DTC_class_acc[0]
+    result_df.at[f'{features_name}_0', f'xgboost_{md}'] = XGB_class_acc[0]
 
     result_df.at[f'{features_name}_1', f'gradient_boost_{md}'] = GBC_class_acc[1]
     result_df.at[f'{features_name}_1', f'random_forest_{md}'] = RFC_class_acc[1]
     result_df.at[f'{features_name}_1', f'decision_tree_{md}'] = DTC_class_acc[1]
+    result_df.at[f'{features_name}_1', f'xgboost_{md}'] = XGB_class_acc[1]
 
-result_df.to_csv("./multiple_result.csv")
+result_df.to_csv("./ckpts/multiple_result.csv")

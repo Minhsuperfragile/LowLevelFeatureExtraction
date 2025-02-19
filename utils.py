@@ -290,7 +290,7 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
     print(f"Training model using {device}")
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     for epoch in (pbar:= tqdm(range(epochs))):
         model.train()
         running_loss = 0.0
