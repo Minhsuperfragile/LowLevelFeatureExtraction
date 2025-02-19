@@ -7,15 +7,15 @@ def permutation_feature_importance(model, device, X, y, n_repeats=10, metric=acc
     Compute permutation feature importance from scratch.
     
     Args:
-    - model (torch.nn.Module): Trained PyTorch model.
-    - device (str): 'cpu' or 'cuda'.
-    - X (torch.Tensor): Feature tensor (batch_size, num_features).
-    - y (torch.Tensor): Ground truth labels.
-    - n_repeats (int): Number of times to shuffle each feature.
-    - metric (function): Scoring function, e.g., accuracy_score.
+      - model (torch.nn.Module): Trained PyTorch model.
+      - device (str): 'cpu' or 'cuda'.
+      - X (torch.Tensor): Feature tensor (num_samples, num_features).
+      - y (torch.Tensor): Ground truth labels.
+      - n_repeats (int): Number of times to shuffle each feature.
+      - metric (function): Scoring function, e.g., accuracy_score.
     
     Returns:
-    - importance_scores (np.array): Importance scores for each feature.
+      - importance_scores (np.array): Importance scores for each feature.
     """
 
     model.eval()  # Ensure model is in evaluation mode
@@ -46,7 +46,7 @@ def permutation_feature_importance(model, device, X, y, n_repeats=10, metric=acc
             shuffled_score = metric(y.cpu().numpy(), shuffled_preds)
 
             # Store the performance drop
-            temp_scores.append(max(0, baseline_score - shuffled_score))  # Avoid negatives
+            temp_scores.append(baseline_score - shuffled_score) 
         
         # 4️⃣ Average across repeats
         importance_scores[feature_idx] = np.mean(temp_scores)
