@@ -19,7 +19,7 @@ def model_predict(X):
 #load device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #output txt for file.
-output_file='/mnt/e/VAST/Low-level-feature/permutation_imp/feature_important.txt'
+output_file='/mnt/e/VAST/Low-level-feature/permutation_imp/feature_important_2.txt'
 #start testing
 with open(output_file, 'w') as f_out:
     for csv_file, model_file in tqdm(list(zip(list_csv, list_model)), total=len(list_csv), desc="Models"):
@@ -45,29 +45,29 @@ with open(output_file, 'w') as f_out:
         all_labels = []
         for batch in test_loader:
             _, metadata, label = batch
-            # all_metadata.append(metadata)
-            # all_labels.append(label)
-        # all_metadata = torch.cat(all_metadata, dim=0)
-        # all_labels = torch.cat(all_labels, dim=0)
+            all_metadata.append(metadata)
+            all_labels.append(label)
+        all_metadata = torch.cat(all_metadata, dim=0)
+        all_labels = torch.cat(all_labels, dim=0)
 
         # Create feature names
-            feature_names = [f'Feature_{i}' for i in range(all_metadata.shape[1])]
+        feature_names = [f'Feature_{i}' for i in range(all_metadata.shape[1])]
         
         # Compute permutation importance over the entire dataset
-            result = permutation_feature_importance(model, device, all_metadata, all_labels, n_repeats=20)
-            if isinstance(result, torch.Tensor):
+        result = permutation_feature_importance(model, device, all_metadata, all_labels, n_repeats=20)
+        if isinstance(result, torch.Tensor):
                 result = result.cpu().numpy().flatten()
 
             # Validate shape
-            if len(result) != all_metadata.shape[1]:
+        if len(result) != all_metadata.shape[1]:
                 raise ValueError("Mismatch: Feature importance result has incorrect dimensions.")
             
-            importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': result})
-            importance_df = importance_df.sort_values(by='Importance', ascending=False)
+        importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': result})
+        importance_df = importance_df.sort_values(by='Importance', ascending=False)
 
-            f_out.write(f'Feature importance for {model_file}\n')
-            for _, row in importance_df.iterrows():
+        f_out.write(f'Feature importance for {model_file}\n')
+        for _, row in importance_df.iterrows():
                 f_out.write(f"{row['Feature']}: {row['Importance']:.6f}\n")
-            f_out.write("-" * 50 + "\n")
+        f_out.write("-" * 50 + "\n")
 
 print('all done :>')
