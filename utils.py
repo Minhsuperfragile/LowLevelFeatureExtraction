@@ -417,6 +417,27 @@ def process_dataframe(
 
 #region Permutation Importance Calculation
 
+def process_confusion_matrix(label, pred):
+    cm = confusion_matrix(label, pred)
+    l = []
+
+    for i in range(cm.shape[0]):
+        class_accuracy = cm[i, i] / cm[i].sum() * 100
+        l.append(class_accuracy)
+        # print(f"Class {i} Accuracy: {class_accuracy:.2f}%")
+
+    return l
+
+def calculate_class_acc(label, pred):
+    classes = np.unique(label)
+    print(len(classes))
+    class_acc = np.zeros(len(classes))
+    for i in classes:
+        class_mask = label == classes[i]
+        class_acc[i] = np.mean(pred[class_mask] == classes[i]) * 100
+    
+    return class_acc
+
 def permutation_feature_importance(model: SimpleNeuralNetwork, df:pd.DataFrame ):
     test_df = df[:len(df)//2]
     swap_df = df[len(df)//2:]
@@ -427,7 +448,9 @@ def permutation_feature_importance(model: SimpleNeuralNetwork, df:pd.DataFrame )
     with torch.no_grad():
         base_predictions = model(torch.Tensor(test_df.iloc[:,1:].to_numpy()))
         _, base_predictions = torch.max(base_predictions.data, 1)
-        base_accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), base_predictions)
+        # base_accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), base_predictions)
+        cm = process_confusion_matrix(test_df.iloc[:,0].to_numpy(), base_predictions )
+        base_metric = cm[1]
 
     # Initialize a list to store the importance scores
     importances = []
@@ -439,7 +462,9 @@ def permutation_feature_importance(model: SimpleNeuralNetwork, df:pd.DataFrame )
         with torch.no_grad():
             predictions = model(torch.Tensor(swapped_test_df.iloc[:,1:].to_numpy()))
             _, predictions = torch.max(predictions.data, 1)
-            accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), predictions)
-            importances.append(accuracy - base_accuracy)
+            # accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), predictions)
+            fcm = process_confusion_matrix(test_df.iloc[:,0].to_numpy(), predictions )
+            metric = fcm[1]
+            importances.append(metric - base_metric)
 
     return importances

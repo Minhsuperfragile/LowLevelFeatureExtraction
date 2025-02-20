@@ -6,7 +6,7 @@ from utils import param_list
 import xgboost as xgb
 
 result_df = pd.read_csv("./ckpts/multiple_result.csv", index_col="features_name")
-md = "nmd"
+md = "md"
 features_mark = 2 if md == "md" else 8
 
 def process_confusion_matrix(label, pred):
@@ -58,8 +58,22 @@ for param in param_list[:1]:
     DTC_accuracy = accuracy_score(y_test, DTC_y_pred)
     DTC_class_acc = process_confusion_matrix(y_test, DTC_y_pred)
 
-    XGB = xgb.XGBClassifier(use_label_encoder=False, eval_metric='logloss')
-    XGB.fit(X_train, y_train)
+    XGB = xgb.XGBClassifier(
+    n_estimators=1000,
+    learning_rate=0.1,
+    max_depth=20,
+    objective="multi:softmax",  # Use softmax for multi-class
+    num_class=2,  # Dynamically set num_class
+    eval_metric="mlogloss",
+    early_stopping_rounds=50,
+    # verbose=True
+)
+    XGB.fit(
+    X_train, y_train,
+    eval_set=[(X_test, y_test)],   # Validation data
+    # early_stopping_rounds=50,        # Stop if no improvement in 50 rounds
+    verbose=True                      # Show training progress
+)
     XGB_y_pred = XGB.predict(X_test)
     XGB_accuracy = accuracy_score(y_test, XGB_y_pred)
     XGB_class_acc = process_confusion_matrix(y_test, XGB_y_pred)

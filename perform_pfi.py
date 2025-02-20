@@ -22,7 +22,7 @@ for param in param_list:
 
     result_data = result_df.to_csv(index_label=False).splitlines()
 
-    with open('./data/pfi_result.txt', 'a') as f:
+    with open('./data/pfi_class1_result.txt', 'a') as f:
         f.write('\n')
         for line in result_data:
             f.write(line + '\n')
