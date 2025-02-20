@@ -11,7 +11,7 @@ from tqdm import tqdm
 from tabulate import tabulate
 import multiprocessing
 import time
-import cv2
+from sklearn.metrics import confusion_matrix, accuracy_score
 
 #region Feature Specifications
 mask = None
@@ -111,11 +111,11 @@ param_list = [
     'params': {'mask': mask, 's': 3},
     'features_set': ['h']
 },
-{
-    "function": pyfeats.amfm_features, #Amplitude Modulation – Frequency Modulation (AM-FM)
-    'params': {'bins': 32},
-    'features_set': ['features'] # Take long time to calculate
-},
+# { Deprecated: Too long to calculate (83 hours)
+#     "function": pyfeats.amfm_features, #Amplitude Modulation – Frequency Modulation (AM-FM)
+#     'params': {'bins': 32},
+#     'features_set': ['features'] # Take long time to calculate
+# },
 # {  Deprecated: generate NaN values in the output
 #     "function": pyfeats.dwt_features, #Discrete Wavelet Transform (DWT)
 #     'params': {'mask': mask, 'wavelet': 'bior3.3', 'levels': 3},
@@ -151,11 +151,11 @@ param_list = [
     'params': {},
     'features_set': ['features']
 },
-{
-    "function": pyfeats.hog_features, #Histogram of Oriented Gradients (HOG)
-    'params': {'ppc': 8, 'cpb': 3},
-    'features_set': ['features']
-}
+# { Deprecated: features size depends on the image size and ppc/cpb values. 
+#     "function": pyfeats.hog_features, #Histogram of Oriented Gradients (HOG)
+#     'params': {'ppc': 8, 'cpb': 3},
+#     'features_set': ['features']
+# }
 ]
 #endregion
 
@@ -168,11 +168,11 @@ class LowLevelFeatureExtractor:
     def __init__(self, function: Callable, # pyfeats function to call
                  params: Dict[str, Any] = None, # pyfeats function parameters
                  features_set: List[str] = None, # list of features to extract,
-                 ) -> None:
+                 image_size: Tuple[int, int] = None) -> None: # size of the input image 
         self.function = function
         self.params = params if params is not None else {}
         self.features_set = features_set
-        # self.image_size = image_size if image_size is not None else (640, 640)
+        self.image_size = image_size if image_size is not None else (384,384)
 
     def __call__(self, images):
         images = np.array(images) if not isinstance(images, np.ndarray) else images
@@ -198,7 +198,7 @@ class LowLevelFeatureExtractor:
         return features
 
     def get_features_size(self) -> int:
-        sample_image = np.random.randint(0, 256, (384,384)).astype("uint8")
+        sample_image = np.random.randint(0, 256, self.image_size).astype("uint8")
         features_set = self.process_single_image(sample_image)
 
         self.features_size = features_set.shape[0]
@@ -206,7 +206,7 @@ class LowLevelFeatureExtractor:
         return self.features_size
 
 class CSVMetadataDataset(Dataset):
-    def __init__(self, csv_file: str, root_dir: str, transform=None):
+    def __init__(self, csv_file: str, root_dir: str, transform=None, md=True):
         self.data = pd.read_csv(csv_file)  # Load CSV file
         self.root_dir = root_dir  # Base directory for images
         self.transform = transform  # Transformations
@@ -214,7 +214,8 @@ class CSVMetadataDataset(Dataset):
         # Extract image paths, labels, and metadata
         # self.image_paths = self.data.iloc[:, 0].values  # Image paths
         self.labels = self.data.iloc[:, 1].values.astype(int)  # Labels
-        self.metadata = self.data.iloc[:, 2:].values.astype(float)  # Metadata features (Numpy array)
+        mark = 2 if md else 8 # Index of the first metadata column
+        self.metadata = self.data.iloc[:, mark:].values.astype(float)  # Metadata features (Numpy array)
 
     def __len__(self):
         return len(self.data)
@@ -224,6 +225,9 @@ class CSVMetadataDataset(Dataset):
         metadata = torch.tensor(self.metadata[idx], dtype=torch.float32)  # Convert metadata to tensor
 
         return np.empty(0), metadata, label # None is used for image data, metadata is used instead
+    
+    def get_input_size(self):
+        return self.metadata.shape[1]
 
 class CSVImageMetadataDataset(Dataset):
     def __init__(self, csv_file: str, root_dir: str, transform=None):
@@ -234,7 +238,7 @@ class CSVImageMetadataDataset(Dataset):
         # Extract image paths, labels, and metadata
         self.image_paths = self.data.iloc[:, 0].values  # Image paths
         self.labels = self.data.iloc[:, 1].values.astype(int)  # Labels
-        self.metadata = self.data.iloc[:, 2:].values.astype(float)  # Metadata features (Numpy array)
+        self.metadata = self.data.iloc[:, 8:].values.astype(float)  # Metadata features (Numpy array)
 
     def __len__(self):
         return len(self.data)  # Total number of samples
@@ -255,9 +259,9 @@ class SwishActivation(torch.nn.Module):
         return x * torch.sigmoid(x)
 
 class SimpleNeuralNetwork(torch.nn.Module):
-    def __init__(self, inputs: int, classes = 3, *args, **kwargs):
+    def __init__(self, inputs: int, classes:int = 3, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fc1 = torch.nn.Linear(inputs + 6, 64)
+        self.fc1 = torch.nn.Linear(inputs, 64)
         self.relu = torch.nn.ReLU()
         self.fc2 = torch.nn.Linear(64, classes)
         self.softmax = torch.nn.Softmax(dim=1)
@@ -286,7 +290,7 @@ def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataL
     print(f"Training model using {device}")
 
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
     for epoch in (pbar:= tqdm(range(epochs))):
         model.train()
         running_loss = 0.0
@@ -310,6 +314,8 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
     model.to(device)
     model.eval()
 
+    all_labels = []
+    all_predicted = []
     correct = 0
     total = 0
     with torch.no_grad():
@@ -317,13 +323,39 @@ def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.Dat
             # inputs = torch.Tensor(llf(inputs)).to(device)
             labels = labels.long().to(device)
             metadata = metadata.to(device)
+
             outputs = model(metadata)
             _, predicted = torch.max(outputs.data, 1)
 
-            total += labels.size(0)
-            correct += (predicted.to(device) == labels).sum().item()
+            # Collect labels and predictions for confusion matrix
+            all_labels.append(labels.cpu().numpy())
+            all_predicted.append(predicted.cpu().numpy())
 
-    return f"Accuracy: {100 * correct / total}% On {features_set}"
+            # Update correct and total counts for overall accuracy
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    # Convert lists to numpy arrays
+    all_labels = np.concatenate(all_labels)
+    all_predicted = np.concatenate(all_predicted)
+
+    # Compute confusion matrix
+    cm = confusion_matrix(all_labels, all_predicted)
+
+    # Calculate overall accuracy
+    accuracy = 100 * correct / total
+
+    # Print overall accuracy
+    print(f"Overall Accuracy: {accuracy:.2f}%")
+
+    l = []
+    # Calculate and print accuracy for each class
+    for i in range(cm.shape[0]):
+        class_accuracy = cm[i, i] / cm[i].sum() * 100
+        l.append(class_accuracy)
+        print(f"Class {i} Accuracy: {class_accuracy:.2f}%")
+    
+    return accuracy, l
 #endregion
 
 #region Data Processing Functions
@@ -380,18 +412,34 @@ def process_dataframe(
         end_time = time.time()
         execution_time = end_time - start_time
         print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")
-    
-def process_dataloader(
-        dl: DataLoader, 
-        llf: LowLevelFeatureExtractor ,
-        root_folder: os.PathLike = "../skin_data", # root image folder 
-        save_path: os.PathLike = "./data/result.csv",
-        n_process: int = None, 
-        time_logger=True
-        ):
-
-    batch_size = dl.batch_size
-
-
 
 #endregion
+
+#region Permutation Importance Calculation
+
+def permutation_feature_importance(model: SimpleNeuralNetwork, df:pd.DataFrame ):
+    test_df = df[:len(df)//2]
+    swap_df = df[len(df)//2:]
+
+    n_features = test_df.shape[1]
+
+    # Compute base acc
+    with torch.no_grad():
+        base_predictions = model(torch.Tensor(test_df.iloc[:,1:].to_numpy()))
+        _, base_predictions = torch.max(base_predictions.data, 1)
+        base_accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), base_predictions)
+
+    # Initialize a list to store the importance scores
+    importances = []
+    for i in range(7,n_features):
+        # Create a copy of the test data and swap the feature column with value from different swap dataframe
+        swapped_test_df = test_df.copy()
+        swapped_test_df.iloc[:, i] = swap_df.iloc[:,i]
+        # Calculate the model's prediction on the swapped test data
+        with torch.no_grad():
+            predictions = model(torch.Tensor(swapped_test_df.iloc[:,1:].to_numpy()))
+            _, predictions = torch.max(predictions.data, 1)
+            accuracy = accuracy_score(test_df.iloc[:,0].to_numpy(), predictions)
+            importances.append(accuracy - base_accuracy)
+
+    return importances

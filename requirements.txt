@@ -4,3 +4,4 @@ numpy
 pandas
 pyfeats
 tqdm
+tabulate
