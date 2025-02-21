@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 import pandas as pd
 from tqdm import tqdm
 from model import *
-from utils import *
+from utils.lowlevelfeatures import *
 #kiem tra thiet bi
 
 def get_transforms(target_size=224):

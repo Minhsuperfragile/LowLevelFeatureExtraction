@@ -1,5 +1,5 @@
 import pandas as pd
-from utils import *
+from utils.lowlevelfeatures import *
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning) # Surpress Numpy Warning 
 
@@ -15,7 +15,7 @@ transform = transforms.Compose([
     ToNumpy(),  # Convert to tensor
 ])
 
-for llf_param in param_list[22:]:
+for llf_param in param_list:
     llf = LowLevelFeatureExtractor(**llf_param, image_size=image_size_normalize)
 
     llf_name = llf.function.__name__

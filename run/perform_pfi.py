@@ -1,4 +1,4 @@
-from utils import *
+from utils.lowlevelfeatures import *
 
 for param in param_list:
     llf = LowLevelFeatureExtractor(**param)

@@ -1,0 +1,115 @@
+import torch
+from model.models import SimpleNeuralNetwork
+from tqdm import tqdm
+from utils.lowlevelfeatures import LowLevelFeatureExtractor
+import os
+from torchvision import transforms
+from PIL import Image
+import pandas as pd
+import numpy as np
+import multiprocessing
+import time
+
+def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, epochs: int, features_set: str):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.train()
+    print(f"Training model using {device}")
+
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    for epoch in (pbar:= tqdm(range(epochs))):
+        model.train()
+        running_loss = 0.0
+        for inputs, metadata, labels in train_loader:
+            optimizer.zero_grad()
+            # inputs = torch.Tensor(llf(inputs)).to(device)
+            labels = labels.long().to(device)
+            metadata = metadata.to(device)
+
+            outputs = model(metadata)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()
+        pbar.set_description(f'Epoch {epoch+1}, Loss: {running_loss / len(train_loader.dataset)}')
+
+    print(f"Training on {features_set} complete!")
+
+def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, features_set = str):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model.to(device)
+    model.eval()
+
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for inputs, metadata, labels in test_loader:
+            # inputs = torch.Tensor(llf(inputs)).to(device)
+            labels = labels.long().to(device)
+            metadata = metadata.to(device)
+            outputs = model(metadata)
+            _, predicted = torch.max(outputs.data, 1)
+
+            total += labels.size(0)
+            correct += (predicted.to(device) == labels).sum().item()
+
+    return f"Accuracy: {100 * correct / total}% On {features_set}"
+
+class MultiprocessingExtractor:
+    def __init__(self):
+        pass
+
+    def __extract_features(self, image_path: os.PathLike, root_folder: os.PathLike, llf: LowLevelFeatureExtractor, transform: transforms.Compose) -> np.ndarray:
+        image_path = os.path.join(root_folder, image_path)
+        image = transform(Image.open(image_path)) # Convert to gray-scale
+        image = np.array(image)
+        features = llf.process_single_image(image)
+        return features
+
+    # Function to process a smaller dataframe chunk
+    def __process_chunk(self, df_chunk: pd.DataFrame, root_folder: os.PathLike, llf: LowLevelFeatureExtractor, transform: transforms.Compose):
+        return [self.__extract_features(row['image'], root_folder, llf, transform) for _, row in df_chunk.iterrows()]
+
+    def process_dataframe(
+            self,
+            df: pd.DataFrame, 
+            llf: LowLevelFeatureExtractor ,
+            transform: transforms.Compose,
+            root_folder: os.PathLike = "../skin_data", # root image folder 
+            save_path: os.PathLike = "./data/result.csv",
+            n_process: int = None, 
+            time_logger=True
+            ) -> None:
+        
+        n_process = multiprocessing.cpu_count()//2 if n_process is None else n_process
+        n_features = llf.get_features_size()
+        start_time = time.time() if time_logger else 0
+        df_chunks = np.array_split(df, n_process)
+
+        # Start multiprocessing pool
+        with multiprocessing.Pool(processes=n_process) as pool:
+            results = pool.starmap(self.__process_chunk, [(chunk, root_folder, llf, transform) for chunk in df_chunks])
+
+        # Combine all processed results into a DataFrame
+        flat_results = [item for sublist in results for item in sublist]  # Flatten list of lists\
+        df_features = pd.DataFrame(flat_results, columns=[f'feature_{i}' for i in range(n_features)])
+        df_features = pd.concat([df_features, df['image']], axis=1)
+
+        # print(tabulate(df_features, headers = 'keys', tablefmt = 'psql'))
+
+        # Merge features with original DataFrame
+        df_final = df.merge(df_features, on="image")
+
+        # Save dataframe to csv
+        save_folder = "/".join(save_path.split("/")[:-1])
+        if not os.path.exists(save_folder):
+            os.mkdir(save_folder)
+        df_final.to_csv(save_path, index=False)
+
+        # Log the execution time
+        # End time tracking
+        if time_logger:
+            end_time = time.time()
+            execution_time = end_time - start_time
+            print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")

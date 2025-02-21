@@ -1,7 +1,7 @@
 from torchvision import transforms
 from torch.utils.data import DataLoader
 import os
-from utils import *
+from utils.lowlevelfeatures import *
 
 root_folder = "../../skin_data/"
 csv_folder = "./data/"
