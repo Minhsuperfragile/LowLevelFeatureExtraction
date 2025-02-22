@@ -121,7 +121,7 @@ class FilesProcessor:
         pass
     
     @staticmethod
-    def generate_csv_from_folder(folder: os.PathLike, save_name: os.PathLike) -> None:
+    def generate_csv_from_folder(folder: os.PathLike, save_name: os.PathLike) -> dict:
         """
         Generate a csv that contain all path to images in the given folder
         Folder must be organized like this:
@@ -129,8 +129,10 @@ class FilesProcessor:
             - class 0
             - class 1 
             - ...
+
+        Return class mapping
         """
-        
+        class_map = {}
         image_path = []
         labels = []
         classes = os.listdir(folder)
@@ -140,9 +142,13 @@ class FilesProcessor:
                 image_path.append(os.path.join(folder, class_name, img))
                 labels.append(class_index)
 
+            class_map[class_index] = class_name
+
         df = pd.DataFrame(data={"image": image_path, "label_id": labels})
         df.to_csv(save_name, index = False)
 
+        return class_map
+    
     @staticmethod
     def get_highest_importance_features():
         #TODO
