@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 import multiprocessing
 import time
+from typing import *
+from collections import defaultdict
 
 def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, epochs: int, features_set: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -113,3 +115,60 @@ class MultiprocessingExtractor:
             end_time = time.time()
             execution_time = end_time - start_time
             print(f"✅ Extracted {save_path} in {execution_time:.2f} seconds.")
+
+class FilesProcessor:
+    def __init__(self):
+        pass
+    
+    @staticmethod
+    def generate_csv_from_folder(folder: os.PathLike, save_name: os.PathLike) -> None:
+        """
+        Generate a csv that contain all path to images in the given folder
+        Folder must be organized like this:
+        - root (train / test)
+            - class 0
+            - class 1 
+            - ...
+        """
+        
+        image_path = []
+        labels = []
+        classes = os.listdir(folder)
+        for class_index, class_name in enumerate(classes):
+            images = os.listdir(os.path.join(folder, class_name))
+            for img in images:
+                image_path.append(os.path.join(folder, class_name, img))
+                labels.append(class_index)
+
+        df = pd.DataFrame(data={"image": image_path, "label_id": labels})
+        df.to_csv(save_name, index = False)
+
+    @staticmethod
+    def get_highest_importance_features():
+        #TODO
+        pass
+
+    @staticmethod
+    def create_result_df(column_name: List[str], feature_name: List[str], n_class: int):
+        """
+        Create a result dataframe with different features set on different models
+        Shape = [features sets, models, classes precision]
+        column_name is a list of models
+        feature_name is a list of features name which will be used as index
+        n_class is number of classes to calculate precision
+        """
+
+        column_name.insert(0, 'features_name')
+
+        data_ = defaultdict(pd.NA)
+        data_[tuple(column_name)]
+        data_["features_name"] = feature_name
+        df = pd.DataFrame(data_, columns=column_name)
+
+        for i in range(n_class):
+            data_ = {"features_name": [f"{x}_{i}" for x in feature_name]}
+            data_[tuple(column_name)] = pd.NA
+            df = pd.concat([df, pd.DataFrame(data_, columns=column_name)], ignore_index=True)
+
+        df.set_index('features_name', inplace=True)
+        return df

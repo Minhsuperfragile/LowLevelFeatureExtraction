@@ -6,8 +6,8 @@ import numpy as np
 import torch
 
 def class_precision(predictions: np.ndarray, labels: np.ndarray, class_:int = 1):
-
-
+    cm = confusion_matrix(labels, predictions)
+    
     pass
 
 def permutation_feature_importance(
