@@ -10,7 +10,8 @@ import numpy as np
 import multiprocessing
 import time
 from typing import *
-from collections import defaultdict
+from datetime import datetime
+import pytz
 
 def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, epochs: int, features_set: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -166,8 +167,8 @@ class FilesProcessor:
 
         column_name.insert(0, 'features_name')
 
-        data_ = defaultdict(pd.NA)
-        data_[tuple(column_name)]
+        data_ = {"features_name": feature_name}
+        data_[tuple(column_name)] = pd.NA
         data_["features_name"] = feature_name
         df = pd.DataFrame(data_, columns=column_name)
 
@@ -178,3 +179,18 @@ class FilesProcessor:
 
         df.set_index('features_name', inplace=True)
         return df
+
+def get_current_datetime(timezone='Asia/Ho_Chi_Minh'):
+    """
+    Returns the current date (Y-m-d) and time (H-M) in the specified timezone.
+    
+    :param timezone: str - the name of the timezone (default is 'Asia/Ho_Chi_Minh')
+    """
+    # Get the timezone object
+    tz = pytz.timezone(timezone)
+    
+    # Get the current time in UTC and convert it to the specified timezone
+    current_datetime = datetime.now(tz)
+    
+    # Return the formatted date and time
+    return current_datetime.strftime("%Y-%m-%d_%H:%M")

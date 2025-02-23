@@ -1,5 +1,10 @@
 import pandas as pd
 from utils.lowlevelfeatures import *
+from utils.tools import MultiprocessingExtractor
+from utils.dataset import ToNumpy
+from utils.constant import param_list
+from torchvision import transforms
+
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning) # Surpress Numpy Warning 
 
@@ -19,5 +24,5 @@ for llf_param in param_list:
     llf = LowLevelFeatureExtractor(**llf_param, image_size=image_size_normalize)
 
     llf_name = llf.function.__name__
-    process_dataframe(test_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_test_{llf_name}.csv")
-    process_dataframe(train_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_train_{llf_name}.csv")
+    MultiprocessingExtractor.process_dataframe(test_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_test_{llf_name}.csv")
+    MultiprocessingExtractor.process_dataframe(train_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_train_{llf_name}.csv")

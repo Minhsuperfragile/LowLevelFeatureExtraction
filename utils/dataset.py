@@ -2,8 +2,13 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 import pandas as pd
+import numpy as np
 from PIL import Image
 import os
+
+class ToNumpy():
+    def __call__(self, *args, **kwds):
+        return np.array(args[0])
 
 class CSVMetadataDataset(Dataset):
     def __init__(self, csv_file: str, root_dir: str, transform=None):

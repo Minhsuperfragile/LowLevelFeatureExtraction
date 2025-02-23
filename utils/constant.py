@@ -1,4 +1,5 @@
 import pyfeats
+import numpy as np
 
 mask = None
 param_list = [

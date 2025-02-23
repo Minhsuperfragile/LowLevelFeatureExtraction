@@ -1,14 +1,27 @@
 from typing import *
 import pandas as pd
-from sklearn.metrics import confusion_matrix
 from model.models import SimpleNeuralNetwork
 import numpy as np
 import torch
 
-def class_precision(predictions: np.ndarray, labels: np.ndarray, class_:int = 1):
-    cm = confusion_matrix(labels, predictions)
-    
-    pass
+def per_class_accuracy(prediction: np.ndarray, labels: np.ndarray) -> Dict[int, float]:
+    """
+    Calculate per-class accuracy.
+
+    :param y_true: np.array of true labels
+    :param y_pred: np.array of predicted labels
+    :return: Dictionary containing accuracy for each class
+    """
+    unique_classes = np.unique(labels)
+    class_accuracy = {}
+
+    for cls in unique_classes:
+        correct_predictions = np.sum((labels == cls) & (prediction == cls))
+        total_samples = np.sum(labels == cls)
+        accuracy = correct_predictions / total_samples if total_samples > 0 else 0
+        class_accuracy[cls] = accuracy
+
+    return class_accuracy
 
 def permutation_feature_importance(
         model: SimpleNeuralNetwork, 

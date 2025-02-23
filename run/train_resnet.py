@@ -6,6 +6,9 @@ import pandas as pd
 from tqdm import tqdm
 from model import *
 from utils.lowlevelfeatures import *
+from utils.dataset import *
+from model.models import ResNetHybrid
+from utils.tools import get_current_datetime
 #kiem tra thiet bi
 
 def get_transforms(target_size=224):
@@ -25,7 +28,7 @@ def get_transforms(target_size=224):
 
 
 
-def train_model(model, train_loader, epochs: int, features_set: str):
+def train_model(model, train_loader, epochs: int, features_set: str, loss_path='loss_history.npy'):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
     model.train()
@@ -33,7 +36,7 @@ def train_model(model, train_loader, epochs: int, features_set: str):
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    
+    loss_history=[]
     for epoch in tqdm(range(epochs), desc="Epochs"):  # Wrap epochs in tqdm
         model.train()
         running_loss = 0.0
@@ -58,8 +61,9 @@ def train_model(model, train_loader, epochs: int, features_set: str):
             running_loss += loss.item()
         
         avg_loss = running_loss / len(train_loader.dataset)
+        loss_history.append(avg_loss)
         print(f"Epoch {epoch+1}/{epochs} - Loss: {avg_loss:.4f}")
-
+    np.save(loss_path,np.array(loss_history))
     print(f"Training on {features_set} complete!")
 
 
@@ -86,28 +90,31 @@ def evaluate_model(model, test_loader, device='cuda'):
     return accuracy
 
 
-path='/mnt/e/VAST/Low-level-feature/data/'
-root_path="/mnt/e/VAST/Skin_detect/skin_data"
+path='../data/vip'
+root_path="../../skin_data"
 folder_names=[name for name in os.listdir(path) if os.path.isdir(os.path.join(path, name))]
 batch_size = 32
 num_workers = 4
-list_csv_test=[f'/mnt/e/VAST/Low-level-feature/data/{i}/vaynen_test_{i}.csv' for i in folder_names]
-list_csv_train=[f'/mnt/e/VAST/Low-level-feature/data/{i}/vaynen_train_{i}.csv' for i in folder_names]
-for train_csv,test_csv in tqdm(list(zip(list_csv_train,list_csv_test)),total=len(list_csv_train), desc="csv"):
-    train_dataset = CSVImageMetadataDataset(csv_file=train_csv, root_dir=root_path)
-    
-    test_dataset = CSVImageMetadataDataset(csv_file=test_csv, root_dir=root_path)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    sample_batch = next(iter(train_dataloader))
-    _, metadata_sample, _ = sample_batch  
-    feature_size = metadata_sample.shape[1]
-    print(f'training csv: {train_csv}')
-    model=ResNetHybrid(resnet_type='resnet50', out_dim=3, n_meta_features=feature_size,pretrained=True)
-    train_model(model,train_loader=train_dataloader,epochs=30,features_set= train_csv)
-    result=evaluate_model(model,test_dataloader,train_csv)
+test_csv=f'../data/vip/vaynen_test_vip_new.csv'
+train_csv=f'../data/vip/vaynen_train_vip_new.csv'
 
-    with open("./hybrid_model/results.txt", "a") as f:
-        f.write(f"{result}\n")
-    
-    torch.save(model, f'./hybrid_model/model_{train_csv}.pth')
+train_dataset = CSVImageMetadataDataset(csv_file=train_csv, root_dir=root_path)
+test_dataset = CSVImageMetadataDataset(csv_file=test_csv, root_dir=root_path)
+
+train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+sample_batch = next(iter(train_dataloader))
+_, metadata_sample, _ = sample_batch  
+feature_size = metadata_sample.shape[1]
+
+print(f'training csv: {train_csv}')
+model=ResNetHybrid(resnet_type='resnet50', out_dim=2, n_meta_features=feature_size,pretrained=True)
+# model=torch.load('model_vip_new.pth')
+train_model(model,train_loader=train_dataloader,epochs=15,features_set= 'vip')
+result=evaluate_model(model,test_dataloader)
+
+with open("results_new_15.txt", "a") as f:
+    f.write(f"{result}\n")
+
+torch.save(model, f'model_vip_new_15.pth')

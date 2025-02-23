@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
-from utils.lowlevelfeatures import param_list
+from utils.constant import param_list
 import xgboost as xgb
 
 result_df = pd.read_csv("./ckpts/multiple_result.csv", index_col="features_name")
