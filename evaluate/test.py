@@ -13,6 +13,7 @@ import pandas as pd
 from tqdm import tqdm
 from model import *
 from utils.lowlevelfeatures import *
+from utils.dataset import *
 
 def plot_confusion_matrix(model, test_loader, device, class_names=None, save_path="confusion_matrix.png"):
     """

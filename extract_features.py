@@ -4,13 +4,14 @@ from utils.tools import MultiprocessingExtractor
 from utils.dataset import ToNumpy
 from utils.constant import param_list
 from torchvision import transforms
+import os
 
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning) # Surpress Numpy Warning 
 
-train_df = pd.read_csv("./data/linux/vaynen_train_linux.csv", delimiter=',')
-test_df = pd.read_csv("./data/linux/vaynen_test_linux.csv", delimiter=',')
-root_folder = "../../skin_data/"
+train_df = pd.read_csv("./vdcd_data/vdcd_train.csv", delimiter=',')
+test_df = pd.read_csv("./vdcd_data/vdcd_test.csv", delimiter=',')
+root_folder = "../viemda/"
 
 image_size_normalize = (384,384)
 
@@ -22,7 +23,10 @@ transform = transforms.Compose([
 
 for llf_param in param_list:
     llf = LowLevelFeatureExtractor(**llf_param, image_size=image_size_normalize)
-
     llf_name = llf.function.__name__
-    MultiprocessingExtractor.process_dataframe(test_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_test_{llf_name}.csv")
-    MultiprocessingExtractor.process_dataframe(train_df, llf, transform, root_folder, save_path=f"./data/{llf_name}/vaynen_train_{llf_name}.csv")
+
+    if not os.path.exists(f"./vdcd_data/{llf_name}"):  # Check if directory exists
+        os.makedirs(f"./vdcd_data/{llf_name}")  # Create directory if it doesn't exist
+
+    MultiprocessingExtractor.process_dataframe(test_df, llf, transform, root_folder, save_path=f"./vdcd_data/{llf_name}/test_{llf_name}.csv")
+    MultiprocessingExtractor.process_dataframe(train_df, llf, transform, root_folder, save_path=f"./vdcd_data/{llf_name}/train_{llf_name}.csv")
