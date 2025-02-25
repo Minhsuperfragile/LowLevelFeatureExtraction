@@ -58,7 +58,7 @@ def evaluate_model(model: SimpleNeuralNetwork | ResNetHybrid,
 
     model.to(device)
     model.eval()
-    predicted, label = np.array([]),  np.array([])
+    predicteds, label = np.array([]),  np.array([])
 
     if not model_is_resnet:
         with torch.no_grad():
@@ -69,10 +69,10 @@ def evaluate_model(model: SimpleNeuralNetwork | ResNetHybrid,
                 _, predicted = torch.max(outputs.data, 1)
 
                 label = np.append(label, labels.cpu().numpy())
-                predicted = np.append(predicted, predicted.cpu().numpy())
+                predicteds = np.append(predicteds, predicted.cpu().numpy())
 
-        accuracy = (predicted == label).sum() / len(label) * 100
-        cm = per_class_accuracy(predicted, label)
+        accuracy = (predicteds == label).sum() / len(label) * 100
+        cm = per_class_accuracy(predicteds, label)
 
     return accuracy, cm
 

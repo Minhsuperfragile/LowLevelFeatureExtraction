@@ -7,13 +7,16 @@ import torch
 
 def permutation_score(pred, labels):
     ca = per_class_accuracy(pred, labels)
-    return ca[1] + ca[2]
+    return ca[1] + ca[0]
+
+data_folder = 'vdcd_data'
+name_format = "test_{name}.csv"
 
 for param in param_list:
     llf = LowLevelFeatureExtractor(**param)
     llf_name = llf.function.__name__
 
-    dataset = pd.read_csv(f'./data/{llf_name}/vaynen_test_{llf_name}_new.csv').drop(['image'], axis='columns')
+    dataset = pd.read_csv(f'./{data_folder}/{llf_name}/{name_format.format(name = llf_name)}').drop(['image'], axis='columns')
     features_size = dataset.shape[1] - 1
 
     checkpoint = torch.load(f"./ckpts/model_{llf_name}.pth", map_location='cpu')
@@ -21,7 +24,7 @@ for param in param_list:
     model.load_state_dict(checkpoint)
     model.eval()
 
-    features_name = [f'feature_{i}' for i in range(features_size-6)]
+    features_name = [f'feature_{i}' for i in range(features_size)]
 
     result = permutation_feature_importance(model, dataset.iloc[:, 1:], dataset.iloc[:, 0], metric=permutation_score)
 
@@ -31,9 +34,9 @@ for param in param_list:
 
     result_data = result_df.to_csv(index_label=False).splitlines()
 
-    with open('./data/pfi_class1_result.txt', 'a') as f:
+    with open('./{data_folder}/pfi_class1_result.txt', 'a') as f:
         f.write('\n')
         for line in result_data:
             f.write(line + '\n')
 
-    print('Result written to ./data/pfi_result.txt')
+    print('Result written to ./{data_folder}/pfi_result.txt')

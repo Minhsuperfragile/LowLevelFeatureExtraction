@@ -98,11 +98,11 @@ param_list = [
     'params': {'mask': mask, 's': 3},
     'features_set': ['h']
 },
-{
-    "function": pyfeats.amfm_features, #Amplitude Modulation – Frequency Modulation (AM-FM)
-    'params': {'bins': 32},
-    'features_set': ['features'] # Take long time to calculate
-},
+# { Deprecated: Take long time to calculate
+#     "function": pyfeats.amfm_features, #Amplitude Modulation – Frequency Modulation (AM-FM)
+#     'params': {'bins': 32},
+#     'features_set': ['features'] 
+# },
 # {  Deprecated: generate NaN values in the output
 #     "function": pyfeats.dwt_features, #Discrete Wavelet Transform (DWT)
 #     'params': {'mask': mask, 'wavelet': 'bior3.3', 'levels': 3},

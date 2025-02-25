@@ -23,26 +23,25 @@ num_workers = 4
 md = True
 result_df = FilesProcessor.create_result_df(column_name=["nn"], feature_name=[feat['function'].__name__ for feat in param_list], n_class=3)
 
-for llf_param_set in param_list[:1]:
+for llf_param_set in param_list:
     llf = LowLevelFeatureExtractor(**llf_param_set)
 
-    # llf_name = llf.function.__name__
-    llf_name = 'vip'
+    llf_name = llf.function.__name__
 
     if not os.path.exists(os.path.join(csv_folder, llf_name)):
         continue
 
-    train_csv = os.path.join(csv_folder, llf_name, f"vaynen_train_{llf_name}_new.csv")
-    test_csv = os.path.join(csv_folder, llf_name, f"vaynen_test_{llf_name}_new.csv")
+    train_csv = os.path.join(csv_folder, llf_name, f"train_{llf_name}.csv")
+    test_csv = os.path.join(csv_folder, llf_name, f"test_{llf_name}.csv")
 
     train_dataset = CSVMetadataDataset(csv_file=train_csv, root_dir=root_folder, use_md = md)
     test_dataset = CSVMetadataDataset(csv_file=test_csv, root_dir=root_folder, use_md = md)
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
 
-    model = SimpleNeuralNetwork(inputs= train_dataset.get_input_size(), classes=2)
+    model = SimpleNeuralNetwork(inputs= train_dataset.get_input_size(), classes=3)
 
-    train_model(model, train_dataloader, llf, 30, llf_name)
+    train_model(model, train_dataloader, 30, llf_name)
     result , cm = evaluate_model(model, test_dataloader, llf_name)
 
     result_df.at[llf_name, f"nn"] = result

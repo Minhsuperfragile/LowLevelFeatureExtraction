@@ -36,20 +36,20 @@ def permutation_feature_importance(
 
     # Compute base metric
     with torch.no_grad():
-        base_preds = model(X1)
+        base_preds = model(torch.Tensor(X1.to_numpy()))
         base_preds = torch.argmax(base_preds, dim=1).cpu().numpy()
     base_metric = metric(base_preds, y1)
 
     importance = []
     for features_idx in range(X1.shape[1]):
-        X_swap = X1.clone()
+        X_swap = X1.copy()
         X_swap.iloc[:, features_idx ] = X2.iloc[:, features_idx]
 
         with torch.no_grad():
-            swap_pred = model(X_swap)
+            swap_pred = model(torch.Tensor(X_swap.to_numpy()))
             swap_pred = torch.argmax(swap_pred, dim=1).cpu().numpy()
 
         swap_metric = metric(swap_pred, y1)
-        importance.append(swap_pred - base_metric)
+        importance.append(swap_metric - base_metric)
 
     return importance

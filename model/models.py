@@ -19,7 +19,7 @@ class SwishActivation(torch.autograd.Function):
 class SimpleNeuralNetwork(torch.nn.Module):
     def __init__(self, inputs: int, classes = 3, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fc1 = torch.nn.Linear(inputs + 6 , 64)
+        self.fc1 = torch.nn.Linear(inputs, 64)
         self.relu = torch.nn.ReLU()
         self.fc2 = torch.nn.Linear(64, classes)
         self.softmax = torch.nn.Softmax(dim=1)
