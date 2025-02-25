@@ -11,7 +11,8 @@ class ToNumpy():
         return np.array(args[0])
 
 class CSVMetadataDataset(Dataset):
-    def __init__(self, csv_file: str, root_dir: str, transform=None):
+    def __init__(self, csv_file: str, root_dir: str, transform=None, use_md: bool= True, md_end: int = None):
+        super(CSVMetadataDataset, self).__init__()
         self.data = pd.read_csv(csv_file)  # Load CSV file
         self.root_dir = root_dir  # Base directory for images
         self.transform = transform  # Transformations
@@ -19,7 +20,10 @@ class CSVMetadataDataset(Dataset):
         # Extract image paths, labels, and metadata
         # self.image_paths = self.data.iloc[:, 0].values  # Image paths
         self.labels = self.data.iloc[:, 1].values.astype(int)  # Labels
-        self.metadata = self.data.iloc[:, 2:].values.astype(float)  # Metadata features (Numpy array)
+        assert not use_md and md_end is not None, "If you don't use metadata, specify which column your data starts by md_end"
+
+        metadata_start_col = 2 if use_md else md_end
+        self.metadata = self.data.iloc[:, metadata_start_col:].values.astype(float)  # Metadata features (Numpy array)
 
     def __len__(self):
         return len(self.data)
@@ -31,7 +35,7 @@ class CSVMetadataDataset(Dataset):
         return np.empty(0), metadata, label # None is used for image data, metadata is used instead
 
 class CSVImageMetadataDataset(Dataset):
-    def __init__(self, csv_file: str, root_dir: str, transform=None, img_size=(224, 224)):
+    def __init__(self, csv_file: str, root_dir: str, transform=None, img_size=(224, 224), use_md:bool = True, md_end: int = None):
         self.data = pd.read_csv(csv_file)  # Load CSV file
         self.root_dir = root_dir  # Base directory for images
         self.img_size = img_size
@@ -43,6 +47,10 @@ class CSVImageMetadataDataset(Dataset):
         # Extract image paths, labels, and metadata
         self.image_paths = self.data.iloc[:, 0].values  # Image paths
         self.labels = self.data.iloc[:, 1].values.astype(int)  # Labels
+
+        assert (not use_md and md_end is not None), "If you don't use metadata, specify which column your data starts by md_end"
+
+        metadata_start_col = 2 if use_md else md_end
         self.metadata = self.data.iloc[:, 2:].values.astype(float)  # Metadata features (Numpy array)
         
     def __len__(self):

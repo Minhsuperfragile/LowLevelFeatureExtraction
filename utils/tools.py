@@ -1,7 +1,8 @@
 import torch
-from model.models import SimpleNeuralNetwork
+from model.models import SimpleNeuralNetwork, ResNetHybrid
 from tqdm import tqdm
 from utils.lowlevelfeatures import LowLevelFeatureExtractor
+from utils.PFI import per_class_accuracy
 import os
 from torchvision import transforms
 from PIL import Image
@@ -13,51 +14,67 @@ from typing import *
 from datetime import datetime
 import pytz
 
-def train_model(model: SimpleNeuralNetwork, train_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, epochs: int, features_set: str):
+def train_model(model: SimpleNeuralNetwork | ResNetHybrid, 
+                train_loader: torch.utils.data.DataLoader, 
+                epochs: int, 
+                features_set: str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model_is_resnet = isinstance(model, ResNetHybrid)
+
     model.to(device)
     model.train()
     print(f"Training model using {device}")
 
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    for epoch in (pbar:= tqdm(range(epochs))):
-        model.train()
-        running_loss = 0.0
-        for inputs, metadata, labels in train_loader:
-            optimizer.zero_grad()
-            # inputs = torch.Tensor(llf(inputs)).to(device)
-            labels = labels.long().to(device)
-            metadata = metadata.to(device)
+    if not model_is_resnet:
+        for epoch in (pbar:= tqdm(range(epochs))):
+            model.train()
+            running_loss = 0.0
+            for inputs, metadata, labels in train_loader:
+                optimizer.zero_grad()
 
-            outputs = model(metadata)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-        pbar.set_description(f'Epoch {epoch+1}, Loss: {running_loss / len(train_loader.dataset)}')
+                labels = labels.long().to(device)
+                metadata = metadata.to(device)
 
-    print(f"Training on {features_set} complete!")
+                outputs = model(metadata)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                running_loss += loss.item()
+            pbar.set_description(f'Epoch {epoch+1}, Loss: {running_loss / len(train_loader.dataset)}')
 
-def evaluate_model(model: SimpleNeuralNetwork, test_loader: torch.utils.data.DataLoader, llf: LowLevelFeatureExtractor, features_set = str):
+        print(f"Training on {features_set} complete!")
+    else:
+        pass
+
+def evaluate_model(model: SimpleNeuralNetwork | ResNetHybrid, 
+                   test_loader: torch.utils.data.DataLoader,  
+                   features_set = str):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model_is_resnet = isinstance(model, ResNetHybrid)
+
     model.to(device)
     model.eval()
+    predicted, label = np.array([]),  np.array([])
 
-    correct = 0
-    total = 0
-    with torch.no_grad():
-        for inputs, metadata, labels in test_loader:
-            # inputs = torch.Tensor(llf(inputs)).to(device)
-            labels = labels.long().to(device)
-            metadata = metadata.to(device)
-            outputs = model(metadata)
-            _, predicted = torch.max(outputs.data, 1)
+    if not model_is_resnet:
+        with torch.no_grad():
+            for inputs, metadata, labels in test_loader:
+                labels = labels.long().to(device)
+                metadata = metadata.to(device)
+                outputs = model(metadata)
+                _, predicted = torch.max(outputs.data, 1)
 
-            total += labels.size(0)
-            correct += (predicted.to(device) == labels).sum().item()
+                label = np.append(label, labels.cpu().numpy())
+                predicted = np.append(predicted, predicted.cpu().numpy())
 
-    return f"Accuracy: {100 * correct / total}% On {features_set}"
+        accuracy = (predicted == label).sum() / len(label) * 100
+        cm = per_class_accuracy(predicted, label)
+
+    return accuracy, cm
 
 class MultiprocessingExtractor:
     def __init__(self):

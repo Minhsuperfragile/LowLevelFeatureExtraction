@@ -137,10 +137,10 @@ param_list = [
     "function": pyfeats.tas_features, #Threshold Adjacency Matrix (TAS)
     'params': {},
     'features_set': ['features']
-},
-{
-    "function": pyfeats.hog_features, #Histogram of Oriented Gradients (HOG)
-    'params': {'ppc': 8, 'cpb': 3},
-    'features_set': ['features']
 }
+# { Deprecated: Too large
+#     "function": pyfeats.hog_features, #Histogram of Oriented Gradients (HOG)
+#     'params': {'ppc': 8, 'cpb': 3},
+#     'features_set': ['features']
+# }
 ]
