@@ -17,7 +17,8 @@ import pytz
 def train_model(model: SimpleNeuralNetwork | ResNetHybrid, 
                 train_loader: torch.utils.data.DataLoader, 
                 epochs: int, 
-                features_set: str):
+                features_set: str,
+                loss_path='loss_history.npy') -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     model_is_resnet = isinstance(model, ResNetHybrid)
@@ -47,7 +48,35 @@ def train_model(model: SimpleNeuralNetwork | ResNetHybrid,
 
         print(f"Training on {features_set} complete!")
     else:
-        pass
+        loss_history=[]
+        for epoch in tqdm(range(epochs), desc="Epochs"):  # Wrap epochs in tqdm
+            model.train()
+            running_loss = 0.0
+            
+            # Wrap the inner loop (batches) in tqdm
+            for images, metadata, labels in tqdm(train_loader, desc=f"Epoch {epoch+1}", leave=False):
+                optimizer.zero_grad()
+                
+                # Move data to the device (GPU/CPU)
+                images = images.to(device)
+                metadata = metadata.to(device)
+                labels = labels.long().to(device)
+                
+                # Forward pass
+                outputs = model(images, metadata)
+                
+                # Compute loss
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
+                
+                running_loss += loss.item()
+            
+            avg_loss = running_loss / len(train_loader.dataset)
+            loss_history.append(avg_loss)
+            print(f"Epoch {epoch+1}/{epochs} - Loss: {avg_loss:.4f}")
+        np.save(loss_path,np.array(loss_history))
+        print(f"Training on {features_set} complete!")
 
 def evaluate_model(model: SimpleNeuralNetwork | ResNetHybrid, 
                    test_loader: torch.utils.data.DataLoader,  
@@ -70,10 +99,20 @@ def evaluate_model(model: SimpleNeuralNetwork | ResNetHybrid,
 
                 label = np.append(label, labels.cpu().numpy())
                 predicteds = np.append(predicteds, predicted.cpu().numpy())
+    else:
+        with torch.no_grad():  # No gradients are needed for evaluation
+            for images, metadata, labels in test_loader:
+                images, metadata, labels = images.to(device), metadata.to(device), labels.to(device)
 
-        accuracy = (predicteds == label).sum() / len(label) * 100
-        cm = per_class_accuracy(predicteds, label)
+                outputs = model(images, metadata)  # Forward pass
+                _, preds = torch.max(outputs, 1)  # Get the predicted class
 
+                label = np.append(label, labels.cpu().numpy())
+                predicteds = np.append(predicteds, preds.cpu().numpy())
+
+    # Calculate accuracy
+    accuracy = (predicteds == label).sum() / len(label) * 100
+    cm = per_class_accuracy(predicteds, label)
     return accuracy, cm
 
 class MultiprocessingExtractor:
@@ -172,9 +211,34 @@ class FilesProcessor:
         return class_map
     
     @staticmethod
-    def get_highest_importance_features():
-        #TODO
-        pass
+    def get_highest_importance_features(text_file: os.PathLike, top_k:int = 20) -> pd.DataFrame:
+        with open(text_file) as f:
+            lines = f.readlines()
+        
+        overall_importance = []
+        overall_name = []
+        overall_id = []
+
+        for line in lines:
+            if len(line) == 0:
+                continue # ignore empty lines
+                
+            elements = line.split(',')
+            if len(elements) == 1:
+                name = elements[0].strip()
+                continue
+
+            if len(elements) == 2:
+                feat = elements[0].split('_')[-1]
+                score = elements[1].strip()
+            
+            overall_importance.append(score)
+            overall_name.append(name)
+            overall_id.append(feat)
+
+        df = pd.DataFrame(data={"name": overall_name, "id": overall_id, "score": overall_importance})
+        df.sort_values(by="score", ascending=False, inplace=True)
+        return df.head(top_k)
 
     @staticmethod
     def create_result_df(column_name: List[str], feature_name: List[str], n_class: int):
@@ -200,6 +264,14 @@ class FilesProcessor:
 
         df.set_index('features_name', inplace=True)
         return df
+    
+    @staticmethod
+    def distill_features(top_k_features: pd.DataFrame, n_class: int) -> pd.DataFrame:
+        """
+        Distill features from a dataframe with top_k_features.
+        """
+        pass
+    #TODO
 
 def get_current_datetime(timezone='Asia/Ho_Chi_Minh'):
     """
